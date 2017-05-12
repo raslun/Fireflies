@@ -6,10 +6,10 @@ int readLDR = A5;
 boolean listening = true;
 
 // Define fundamental values
-int lightThresh = 25;
+int lightThresh = 7;
 int basePhase = 500;
 int deafPeriod = 10;
-double freqSpread = 0.4;
+double freqSpread = 0.2;
 
 // Set initial values
 int blinkThresh = basePhase;
@@ -18,7 +18,7 @@ int phase;
 // Define curve response values
 double beta = 0.5;
 // Phase
-double thau = 0.1;
+double thau = 0;
 double alpha = 0.5;
 // Frequency
 
@@ -38,20 +38,23 @@ void loop() {
   // Define local variables
   double p;
   double f;
+  double silent = 0;
   
   // Calculate next phase
   phase = phase+1;
   double blinkFreshShadow = double(blinkThresh);
-  double refPhase = double(phase)/blinkFreshShadow; // Phase described as 0 to 1 in double instead of 0 to blinkThresh in int
+  double refPhase = double(phase)/blinkFreshShadow; // Phase described as 0 to 1 in double instead of 0 
+to blinkThresh in int
   if(refPhase >= 1){
     digitalWrite(outLED, HIGH);
     phase = 0;
+    silent = 0;
   } else if(phase > deafPeriod){
     digitalWrite(outLED, LOW);
   }
   // Get the input data and adjust phase and frequency
   int input = analogRead(readLDR);
-  if(input < lightThresh){
+  if(input < lightThresh && silent <= refPhase && phase > deafPeriod){
     listening = true;
   }
   if(input > lightThresh && refPhase > thau && listening){
@@ -68,20 +71,24 @@ void loop() {
     if (refPhase <= thau){
          f = 1;
     }
-    else if (refPhase <= (thau+beta/2)){
+    else if (refPhase <= (3*beta/4)){
        f = 1+alpha*thau-alpha*refPhase;
     }
     else if (refPhase <= beta){
        f = 1;
     }
     else{ //refPhase > beta
-       f = double(1.25+0.5*(0.5-refPhase));
+       f = double(1.25+0.5*(beta-refPhase));
     }
     double adjust = 1/f;
     blinkThresh = blinkThresh*adjust;    /// blinkthresh / f ? 
     phase = p*blinkThresh;
+    silent = refPhase + thau;
+    if(silent > 1){
+      silent = 1;
+    }
   }
   Serial.print(input);
   Serial.print('\n');
-  delay(1);
-} 
+  delay(1); // To not cause an overflow in phase counter
+}
